@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">拾音</string>
+    <string name="tab_songs">歌曲</string>
+    <string name="tab_albums">专辑</string>
+    <string name="tab_artists">艺术家</string>
+    <string name="tab_folders">文件夹</string>
+    <string name="tab_playlists">歌单</string>
+    <string name="now_playing">正在播放</string>
+    <string name="queue">播放队列</string>
+    <string name="settings">设置</string>
+    <string name="sound">音质</string>
+    <string name="skins">皮肤</string>
+    <string name="unknown_artist">未知艺术家</string>
+    <string name="unknown_album">未知专辑</string>
+    <string name="empty_library">曲库是空的</string>
+    <string name="empty_hint">点下面的按钮扫描本地音乐，或在「文件夹」里添加自定义目录</string>
+    <string name="scan_now">立即扫描</string>
+    <string name="scanning">扫描中</string>
+    <string name="permission_title">需要读取音频的权限</string>
+    <string name="permission_body">拾音完全离线运行，只读取你手机里的音乐文件，不会联网，也不会上传任何东西。</string>
+    <string name="grant">授予权限</string>
+    <string name="offline_badge">纯离线 · 无网络权限</string>
+    <string name="favorites">我喜欢</string>
+    <string name="search">搜索</string>
+    <string name="play_all">播放全部</string>
+    <string name="shuffle_play">随机播放</string>
+</resources>

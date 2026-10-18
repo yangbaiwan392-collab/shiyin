@@ -1,0 +1,40 @@
+# Android / Gradle
+.gradle/
+.kotlin/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 本机配置文件（含 SDK 路径，因机器而异）
+local.properties
+
+# 构建产物（APK 走 GitHub Releases 分发，不进 git）
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# IDE
+.idea/
+*.iml
+*.hprof
+
+# 日志
+*.log
+*.err
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 签名材料（永远不要提交）
+*.jks
+*.keystore
+keystore.properties
+
+# 根目录的开发过程截图（迭代记录，不入库；只提交 screenshots/ 里的正式截图）
+*.png
+!screenshots/*.png

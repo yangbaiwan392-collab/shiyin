@@ -1,0 +1,8 @@
+<resources>
+    <color name="ink">#FF0B1F1B</color>
+    <color name="seed_moss">#FF1B6B5A</color>
+    <color name="icon_bg_top">#FF0E3B32</color>
+    <color name="icon_bg_bottom">#FF17624F</color>
+    <color name="icon_mark">#FFF3EFE4</color>
+    <color name="icon_mark_dim">#FFBFE3D6</color>
+</resources>
