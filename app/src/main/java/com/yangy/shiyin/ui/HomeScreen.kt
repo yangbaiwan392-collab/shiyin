@@ -97,6 +97,9 @@ fun HomeScreen(
     }
 
     Scaffold(
+        // 透明底：让自定义皮肤的 background 图能透出来。
+        // 没背景图时，外层 MainActivity 的 Box 已经铺了主题色，所以不会变黑。
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
             Column(
                 modifier = Modifier.statusBarsPadding().fillMaxWidth(),
@@ -112,7 +115,11 @@ fun HomeScreen(
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Rounded.Settings, "设置") }
                 }
                 Spacer(Modifier.height(8.dp))
-                TabRow(selectedTabIndex = tab) {
+                TabRow(
+                    selectedTabIndex = tab,
+                    // 透明：让皮肤背景透到标签栏，否则这里会是一条白底
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                ) {
                     TABS.forEachIndexed { index, title ->
                         Tab(
                             selected = tab == index,

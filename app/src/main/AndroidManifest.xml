@@ -2,9 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 离线保证：显式移除任何依赖可能带入的网络权限，合并后 APK 无法联网 -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <!--
+      联网能力只用于一件事：用户在设置里显式打开「联网找歌词」后，
+      播放本地没有 .lrc 的歌曲时去取一次歌词，取到就落成本地文件，之后不再联网。
+      播放本身、扫描、封面、EQ 全部在本地完成，不依赖任何网络。
+
+      定位权限永久移除：这个 App 没有任何理由知道你在哪。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />

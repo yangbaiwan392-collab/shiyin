@@ -17,6 +17,8 @@ import com.yangy.shiyin.data.repo.DarkMode
 @Composable
 fun ShiyinTheme(
     skin: Skin = Skin.MOSS,
+    /** 自定义皮肤优先于内置皮肤；为空则用内置的那套 */
+    customSkin: CustomSkin? = null,
     darkMode: DarkMode = DarkMode.FOLLOW_SYSTEM,
     dynamicFromCover: Boolean = false,
     coverSeed: Color? = null,
@@ -28,7 +30,8 @@ fun ShiyinTheme(
         DarkMode.DARK -> true
         DarkMode.FOLLOW_SYSTEM -> isSystemInDarkTheme()
     }
-    val fallback = if (dark) skin.darkSeed else skin.lightSeed
+    // 自定义皮肤优先；否则用内置枚举
+    val fallback = customSkin?.accent(dark) ?: if (dark) skin.darkSeed else skin.lightSeed
 
     val scheme = when {
         customAccent != null -> schemeFor(customAccent, dark)
@@ -36,7 +39,7 @@ fun ShiyinTheme(
         else -> schemeFor(fallback, dark)
     }
 
-    val surface = if (dark) skin.darkSurface else skin.lightSurface
+    val surface = customSkin?.surface(dark) ?: if (dark) skin.darkSurface else skin.lightSurface
     // 皮肤始终决定表面色与层级；封面取色/自定义色只替换强调色，不覆盖皮肤基调
     val finalScheme = scheme.copy(background = surface, surface = surface)
 
@@ -51,7 +54,7 @@ fun ShiyinTheme(
     MaterialTheme(
         colorScheme = finalScheme,
         typography = ShiyinTypography,
-        shapes = ShiyinShapes(skin.roundDp),
+        shapes = ShiyinShapes(customSkin?.roundDp ?: skin.roundDp),
         content = content,
     )
 }

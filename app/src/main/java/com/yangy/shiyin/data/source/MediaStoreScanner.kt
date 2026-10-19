@@ -21,6 +21,11 @@ class MediaStoreScanner(private val context: Context) {
         var skippedShort = 0
         var skippedUnsupported = 0
 
+        // 先给整库的 .lrc 建一次索引：MediaStore 的音频表里没有歌词文件（它不是音频），
+        // 所以必须单独查一次 Files 表，按「目录 + 基名」配给曲目。
+        // 查不到（权限不足/分区限制）就退化成空表，不影响扫描。
+        val lrcByFolderBase = indexLyrics()
+
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.DISPLAY_NAME,
@@ -86,8 +91,11 @@ class MediaStoreScanner(private val context: Context) {
                 if (exclusions.any { uri.startsWith(it) || name.startsWith(it) }) {
                     continue
                 }
-                val folder = PathUtil.normalizeFolder("内部存储", cursor.getString(relativeCol) ?: "")
+                val relative = cursor.getString(relativeCol) ?: ""
+                val folder = PathUtil.normalizeFolder("内部存储", relative)
                 val title = cursor.getString(titleCol)?.takeIf { it.isNotBlank() } ?: name.substringBeforeLast('.')
+                // 同目录同基名的 .lrc（索引键：目录 + 小写基名）
+                val lrc = lrcByFolderBase[relative.trimEnd('/').lowercase() + "|" + name.substringBeforeLast('.').lowercase()]
                 tracks += Track(
                     id = uri.stableId(),
                     uri = uri,
@@ -114,7 +122,7 @@ class MediaStoreScanner(private val context: Context) {
                     dateAddedSec = if (cursor.isNull(addedCol)) 0L else cursor.getLong(addedCol),
                     dateModifiedSec = if (cursor.isNull(modifiedCol)) 0L else cursor.getLong(modifiedCol),
                     hasEmbeddedArt = false,
-                    lrcUri = null,
+                    lrcUri = lrc,
                     resumePositionMs = if (cursor.isNull(bookmarkCol)) 0L else cursor.getLong(bookmarkCol),
                     scanToken = token,
                 )
@@ -126,5 +134,46 @@ class MediaStoreScanner(private val context: Context) {
     private fun cleanMediaValue(raw: String?): String {
         val value = raw?.trim().orEmpty()
         return if (value.isEmpty() || value == MediaStore.UNKNOWN_STRING) "" else value
+    }
+
+    /**
+     * 给整库的 .lrc 建索引：`目录|小写基名` → 内容 URI。
+     *
+     * 为什么单独查一次：MediaStore 的音频表里没有歌词文件（它不是音频），
+     * 只有 Files 表按文件名索引所有文件。Android 10 以下没有 RELATIVE_PATH，
+     * 那时返回空表，由 Lyrics 面板里的 DATA 列兜底。
+     *
+     * 权限不足、查询抛异常都吞掉返回空——歌词找不到不该让整个扫描失败。
+     */
+    private fun indexLyrics(): Map<String, String> {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return emptyMap()
+        val out = HashMap<String, String>()
+        val filesUri = MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns._ID,
+            MediaStore.Files.FileColumns.DISPLAY_NAME,
+            MediaStore.Files.FileColumns.RELATIVE_PATH,
+        )
+        runCatching {
+            context.contentResolver.query(
+                filesUri,
+                projection,
+                "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?",
+                arrayOf("%.lrc"),
+                null,
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                val relCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.RELATIVE_PATH)
+                while (cursor.moveToNext()) {
+                    val name = cursor.getString(nameCol) ?: continue
+                    val rel = cursor.getString(relCol) ?: ""
+                    val id = cursor.getLong(idCol)
+                    out[rel.trimEnd('/').lowercase() + "|" + name.substringBeforeLast('.').lowercase()] =
+                        ContentUris.withAppendedId(filesUri, id).toString()
+                }
+            }
+        }
+        return out
     }
 }

@@ -83,6 +83,8 @@ fun PlayerScreen(
     val track = state.current
     val duration = if (state.durationMs > 0) state.durationMs else track?.durationMs ?: 0
 
+    Box(modifier = Modifier.fillMaxSize()) {
+    CoverBackdrop(track)
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -192,6 +194,7 @@ fun PlayerScreen(
             onToggleLyrics = { lyricsOn = !lyricsOn },
             favorite = track?.isFavorite == true,
         )
+    }
     }
 
     if (showQueue) {

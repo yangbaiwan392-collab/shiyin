@@ -14,6 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -81,14 +82,41 @@ fun Root() {
         }
     }
 
+    // 自定义皮肤优先：skinId 是 "c..." 开头就去 SkinStore 里找那份导入的皮肤
+    val customSkin = androidx.compose.runtime.remember(settings.skinId) {
+        if (settings.skinId.startsWith("c")) {
+            com.yangy.shiyin.data.repo.SkinStore.find(context, settings.skinId)
+        } else {
+            null
+        }
+    }
+
     ShiyinTheme(
         skin = Skin.fromId(settings.skinId),
+        customSkin = customSkin,
         darkMode = settings.darkMode,
         dynamicFromCover = settings.dynamicFromCover,
         coverSeed = coverSeed,
         customAccent = settings.customAccent?.let { androidx.compose.ui.graphics.Color(it) },
     ) {
-        Content(vm)
+        androidx.compose.foundation.layout.Box(
+            modifier = androidx.compose.ui.Modifier
+                .fillMaxSize()
+                // 底层纯色：没背景图时就是它；有背景图时被盖住
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            // 自定义皮肤带了背景图就铺在最底层；播放页的封面叠底会盖在它上面
+            if (customSkin?.hasBackground == true) {
+                com.yangy.shiyin.ui.SkinBackdrop(customSkin.id)
+                // 半透明压暗层：保证列表文字在花哨背景上仍然看得清
+                androidx.compose.foundation.layout.Box(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f)),
+                )
+            }
+            Content(vm)
+        }
     }
 }
 
@@ -124,7 +152,8 @@ private fun Content(vm: AppViewModel) {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        // 透明：让底层的皮肤背景图透出来。纯色底由外层 Box 负责，所以没有背景图时也不会变黑
+        color = androidx.compose.ui.graphics.Color.Transparent,
     ) {
         if (!granted.value) {
             PermissionGate { launcher.launch(permissions.toTypedArray()) }

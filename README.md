@@ -96,3 +96,60 @@ E:\Android\Sdk\build-tools\36.0.0\aapt2.exe dump permissions app\build\outputs\a
 - APE + CUE 整轨分轨。
 - 桌面小组件、Android Auto 媒体浏览器（服务已声明 `MediaBrowserService` intent filter，但浏览器树未实现）。
 - m3u / 设置导入导出。
+
+## 自定义皮肤
+
+除了内置 8 套，还能导入自己做的皮肤。路径：设置 → 皮肤。
+
+### 最省事：从图片直接生成
+
+设置 → 皮肤 → **从图片生成**，选任意一张图（壁纸、专辑封面、截图都行）：
+
+- 自动提取图片主色，推导出亮色/暗色两套配色
+- 这张图本身铺满 app 底层当背景
+- 全程本地计算，不联网
+
+不需要写任何配置。
+
+### 手写配置：一个 JSON 文件
+
+```json
+{
+  "name": "深夜蓝",
+  "accentLight": "#2F5D8A",
+  "accentDark": "#86BCE8",
+  "surfaceLight": "#F1F5F9",
+  "surfaceDark": "#0B1118",
+  "roundDp": 16
+}
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 皮肤名，最多 24 字 |
+| `accentLight` / `accentDark` | 亮色 / 暗色下的强调色 |
+| `surfaceLight` / `surfaceDark` | 亮色 / 暗色下的背景色 |
+| `roundDp` | 圆角，0–32 |
+
+颜色写 `#RRGGBB` 或 `#AARRGGBB`。
+
+**带背景图：打包成 ZIP**
+
+```
+skin.json          （同上，必须有）
+background.jpg     （可选，铺满 app 底层；png / webp 也行）
+```
+
+导入时选 `.json` 或 `.zip` 都可以。
+
+**其他**
+
+- 导入后立刻切换过去，存在手机上（`files/skins/<id>/`），不需要存储权限
+- 长按自定义皮肤色卡可以删除
+- 皮肤只改视觉，不影响播放
+
+仓库里的 `skins/` 目录放了一个示例皮肤可以直接试。
+
+## 致谢
+
+- 致谢 GD 音乐提供歌词与封面。

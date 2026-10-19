@@ -53,6 +53,8 @@ data class AppSettings(
     val resumePlayback: Boolean = true,
     val scanMinSeconds: Int = 20,
     val skipNotifications: Boolean = true,
+    /** 是否允许联网补全歌词与封面（默认关；开启后也只在 WiFi 下联网） */
+    val lyricOnline: Boolean = false,
 ) {
     val ampingLinear: Float get() = 1f + volumeBoostPercent / 100f
     val effectsAllowed: Boolean get() = outputPath.supportsEffects
@@ -113,6 +115,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
                 this[K_RESUME] = next.resumePlayback
                 this[K_MINSEC] = next.scanMinSeconds
                 this[K_SKIP_NOTIF] = next.skipNotifications
+                this[K_LYRIC_ONLINE] = next.lyricOnline
             }
         }
     }
@@ -150,6 +153,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
             resumePlayback = this[K_RESUME] ?: true,
             scanMinSeconds = this[K_MINSEC] ?: 20,
             skipNotifications = this[K_SKIP_NOTIF] ?: true,
+            lyricOnline = this[K_LYRIC_ONLINE] ?: false,
         )
     }
 
@@ -184,5 +188,6 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val K_RESUME = booleanPreferencesKey("resume")
         val K_MINSEC = intPreferencesKey("scan_min_seconds")
         val K_SKIP_NOTIF = booleanPreferencesKey("skip_notif")
+        val K_LYRIC_ONLINE = booleanPreferencesKey("lyric_online")
     }
 }

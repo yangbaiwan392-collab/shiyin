@@ -1,7 +1,10 @@
 package com.yangy.shiyin.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +68,7 @@ import com.yangy.shiyin.data.model.SampleRate
 import com.yangy.shiyin.data.repo.DarkMode
 import com.yangy.shiyin.data.repo.ListDensity
 import com.yangy.shiyin.data.repo.PlayerLayout
+import com.yangy.shiyin.ui.theme.CustomSkin
 import com.yangy.shiyin.ui.theme.Skin
 
 /** 10 段均衡器预设，单位 dB */
@@ -172,13 +176,32 @@ fun SettingsScreen(
                 ) { Text(if (scanState is com.yangy.shiyin.data.repo.ScanState.Running) "扫描中…" else "重新扫描") }
             }
 
+            item { GroupTitle("歌词与封面") }
+            item {
+                // 全 App 唯一会联网的地方。只在 WiFi 下走，移动数据永不联网。
+                ToggleRow("联网补全歌词与封面（仅 WiFi）", settings.lyricOnline) { value ->
+                    vm.update { s -> s.copy(lyricOnline = value) }
+                }
+            }
+            item {
+                Text(
+                    if (settings.lyricOnline) {
+                        "已开启：歌曲本地没有歌词或封面时，连上 WiFi 会自动补一次，补到的内容存到手机上，之后不再联网。移动数据下不会联网。只发送「歌名 + 艺术家」，不上传其它任何信息。"
+                    } else {
+                        "未开启：全程不联网。歌词读同目录的 .lrc，封面读音频文件内嵌的图；都没有就不显示。"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             item { GroupTitle("隐私与信息") }
             item { NavRow("关于拾音", "权限清单、隐私声明与依赖校验和", onOpenAbout) }
             item {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                    Text("拾音不联网", fontWeight = FontWeight.SemiBold)
+                    Text("本地播放，默认不联网", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "APK 未声明 INTERNET 权限，系统在层面禁止本应用建立任何网络连接。封面、歌词、元数据全部来自音频文件本身，播放记录与设置只保存在本机。",
+                        "扫描、播放、均衡器、歌单全部在本机完成，没有广告、账号与统计。唯一联网的入口是上面的「联网补全歌词与封面」，默认关闭；打开后也只发送「歌名 + 艺术家」，不上传播放记录、歌单或设备信息。定位与 WiFi 状态权限始终未申请。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -332,6 +355,54 @@ private fun EqGrid(gains: FloatArray, enabled: Boolean, onChange: (Int, Float) -
 @Composable
 fun SkinScreen(onBack: () -> Unit, vm: AppViewModel = viewModel()) {
     val settings by vm.settings.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var customSkins by remember { mutableStateOf<List<CustomSkin>>(emptyList()) }
+    var importMessage by remember { mutableStateOf<String?>(null) }
+
+    fun reloadCustomSkins() {
+        customSkins = com.yangy.shiyin.data.repo.SkinStore.list(context)
+    }
+    LaunchedEffect(Unit) { reloadCustomSkins() }
+
+    val importer = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                com.yangy.shiyin.data.repo.SkinStore.import(context, uri)
+                    .onSuccess { skin ->
+                        reloadCustomSkins()
+                        vm.update { it.copy(skinId = skin.id) }
+                        importMessage = "已导入「${skin.name}」并切换过去"
+                    }
+                    .onFailure { error ->
+                        importMessage = "导入失败：${error.message ?: "未知错误"}"
+                    }
+            }
+        }
+    }
+
+    // 从任意图片生成皮肤：不用手写 JSON，壁纸 / 封面 / 截图都能用
+    val imageImporter = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                importMessage = "正在从图片提取配色…"
+                com.yangy.shiyin.data.repo.SkinStore.fromImage(context, uri, null)
+                    .onSuccess { skin ->
+                        reloadCustomSkins()
+                        vm.update { it.copy(skinId = skin.id) }
+                        importMessage = "已从图片生成「${skin.name}」并切换过去"
+                    }
+                    .onFailure { error ->
+                        importMessage = "生成失败：${error.message ?: "未知错误"}"
+                    }
+            }
+        }
+    }
+
     SettingsScaffold("皮肤", onBack) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
@@ -350,6 +421,62 @@ fun SkinScreen(onBack: () -> Unit, vm: AppViewModel = viewModel()) {
                     }
                 }
             }
+            GroupTitle("自定义皮肤")
+            if (customSkins.isEmpty()) {
+                Text(
+                    "还没有自定义皮肤。下面可以导入 .json 或 .zip 皮肤包。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
+            } else {
+                customSkins.chunked(4).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        row.forEach { skin ->
+                            CustomSkinTile(
+                                skin = skin,
+                                selected = skin.id == settings.skinId,
+                                onSelect = { vm.update { it.copy(skinId = skin.id) } },
+                                onDelete = {
+                                    com.yangy.shiyin.data.repo.SkinStore.delete(context, skin.id)
+                                    if (settings.skinId == skin.id) vm.update { it.copy(skinId = "moss") }
+                                    reloadCustomSkins()
+                                    importMessage = "已删除「${skin.name}」"
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.Button(
+                    onClick = { importer.launch(arrayOf("*/*")) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("导入皮肤包", fontSize = 13.sp) }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { imageImporter.launch(arrayOf("image/*")) },
+                    modifier = Modifier.weight(1f),
+                ) { Text("从图片生成", fontSize = 13.sp) }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "「从图片生成」会提取图片主色，并把这张图当背景，适合用壁纸或专辑封面直接做皮肤。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            importMessage?.let { message ->
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    message,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             GroupTitle("深色模式")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DarkMode.entries.forEach { mode ->
@@ -417,6 +544,72 @@ private fun SkinTile(skin: Skin, selected: Boolean, onClick: () -> Unit) {
         }
         Spacer(Modifier.height(6.dp))
         Text(skin.label, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+/**
+ * 自定义皮肤色卡。点一下切换过去，长按询问是否删除。
+ * 带背景图的皮肤会在名字下面标一行「含背景」。
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun CustomSkinTile(
+    skin: CustomSkin,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.secondaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
+            .combinedClickable(onClick = onSelect, onLongClick = { confirmDelete = true })
+            .padding(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Color(skin.accentLight)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(6.dp)
+                    .size(28.dp)
+                    .align(Alignment.BottomEnd)
+                    .clip(CircleShape)
+                    .background(Color(skin.accentDark)),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            skin.name,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        )
+        if (skin.hasBackground) {
+            Text("含背景", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    if (confirmDelete) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("删除这个皮肤？") },
+            text = { Text("「${skin.name}」会从手机上移除，之后可以重新导入。") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("取消") }
+            },
+        )
     }
 }
 

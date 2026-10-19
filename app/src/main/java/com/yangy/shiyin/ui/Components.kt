@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -107,12 +108,86 @@ fun Cover(
     }
 }
 
+/**
+ * 封面叠底：把当前曲目的封面放大、模糊、压暗之后铺满整个背景。
+ *
+ * 为什么选叠底而不是唱片机样式：播放页纵向空间要留给歌词和控件，
+ * 圆形唱盘会挤掉一大块；叠底零空间成本，且更接近 Winamp 那种"氛围底板"。
+ *
+ * 没有封面时不画任何东西，退回主题色背景。
+ * Android 12 以下没有 Modifier.blur，用「低透明度 + 渐变压暗」达到近似效果。
+ */
+@Composable
+fun CoverBackdrop(track: Track?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(null, track?.uri) {
+        value = if (track == null) null else CoverArt.load(context, track)
+    }
+    val image = bitmap ?: return
+    val background = MaterialTheme.colorScheme.background
+
+    Box(modifier = modifier.fillMaxSize()) {
+        androidx.compose.foundation.Image(
+            bitmap = image.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alpha = 0.42f,
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        Modifier.blur(56.dp)
+                    } else {
+                        Modifier
+                    }
+                ),
+        )
+        // 从透明到背景色的竖直渐变：保证上方控件与歌词始终可读
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to background.copy(alpha = 0.45f),
+                        0.45f to background.copy(alpha = 0.72f),
+                        1f to background.copy(alpha = 0.94f),
+                    )
+                )
+        )
+    }
+}
+
+/**
+ * 自定义皮肤自带的背景图，铺满整个 app 底层。
+ *
+ * 只有皮肤包里有 background.* 时才会画；没有就什么都不做，退回主题色背景。
+ * 播放页自己的封面叠底会盖在这层上面，所以两者不会打架。
+ */
+@Composable
+fun SkinBackdrop(skinId: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(null, skinId) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val file = com.yangy.shiyin.data.repo.SkinStore.backgroundFile(context, skinId)
+                if (file == null) null else android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+            }.getOrNull()
+        }
+    }
+    val image = bitmap ?: return
+    androidx.compose.foundation.Image(
+        bitmap = image.asImageBitmap(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.fillMaxSize(),
+    )
+}
+
 @Composable
 fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.labelSmall,        color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
         modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
     )

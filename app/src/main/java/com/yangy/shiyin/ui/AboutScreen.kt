@@ -93,9 +93,15 @@ private val DECLARED = listOf(
         reason = "读取蓝牙耳机/车机的 AVRCP 元数据并响应线控。不用于扫描设备。",
         kind = PermKind.RUNTIME,
     ),
+    PermissionEntry(
+        name = "android.permission.INTERNET",
+        title = "访问网络（仅歌词）",
+        reason = "只在设置里打开「联网查找歌词」后才会用，用于按歌名查一次歌词；关闭时不发出任何请求。",
+        kind = PermKind.INSTALL,
+    ),
 )
 
-private const val NOT_REQUESTED = "android.permission.INTERNET"
+
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
@@ -111,10 +117,12 @@ fun AboutScreen(onBack: () -> Unit) {
         ) {
             GroupTitle("版本")
             Text("拾音 ${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", style = MaterialTheme.typography.bodyMedium)
-            Text("纯本地播放，无账号、无统计、无广告", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("本地无广告音乐播放器", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            GroupTitle("隐私声明")
-            Body("""本应用不申请网络权限，APK 中未声明 INTERNET，系统在层面禁止其建立任何网络连接：无法上传播放记录、无法回传设备信息，也无法在线抓取封面或歌词。封面、歌词、标题、艺术家等全部来自音频文件自身的元数据；扫描结果、歌单、播放次数、断点位置与所有设置只写入本机数据库。卸载即彻底清除。""")
+            GroupTitle("联网说明")
+            Body("""拾音是本地播放器：扫描、播放、均衡器、歌单全部在本机完成，不需要联网，也没有任何广告、账号或统计。
+
+唯一会联网的地方是「歌词与封面」：默认关闭。只有你在设置里手动打开「联网补全歌词与封面」之后，遇到本地没有歌词或没有封面的歌曲时，才会把「歌名 + 艺术家」发出去查一次；查到的东西会立刻存成本地文件，之后永不重复请求。除此之外不上传任何东西——不上传播放记录、不上传播放列表、不上传设备信息。""")
 
             GroupTitle("权限清单")
             DECLARED.forEach { entry ->
@@ -129,6 +137,9 @@ fun AboutScreen(onBack: () -> Unit) {
 
             GroupTitle("第三方组件与来源校验")
             Body("""Media3 / ExoPlayer 1.11.1、Jetpack Compose、Room、DataStore 均来自 Google 与 Maven Central 官方仓库。全部为 JVM 依赖，不含任何原生解码库 —— APK 里只有 MediaCodec 这一条系统解码通路。""")
+
+            GroupTitle("致谢")
+            Body("""致谢 GD 音乐提供歌词与封面。""")
 
             Spacer(Modifier.height(40.dp))
         }
@@ -169,18 +180,18 @@ private fun NotRequestedCard() {
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("网络访问", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Text("定位与 WiFi 信息", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 StatusChip("未申请")
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "即使某个依赖试图声明它，清单合并阶段也会被强制移除。",
+                "这两个权限用不到任何功能，清单合并阶段会被强制移除。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                NOT_REQUESTED + " · 以及 ACCESS_NETWORK_STATE、ACCESS_WIFI_STATE、定位权限，全部未申请",
+                "ACCESS_FINE_LOCATION · ACCESS_COARSE_LOCATION · ACCESS_WIFI_STATE —— 全部未申请",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 fontSize = 11.sp,

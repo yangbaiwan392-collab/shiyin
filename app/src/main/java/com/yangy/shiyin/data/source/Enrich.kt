@@ -10,6 +10,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.util.LruCache
+import com.yangy.shiyin.app
 import com.yangy.shiyin.data.entity.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -157,22 +158,48 @@ object CoverArt {
 
     suspend fun load(context: Context, track: Track): Bitmap? = withContext(Dispatchers.IO) {
         cache.get(track.uri)?.let { return@withContext it }
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(context, Uri.parse(track.uri))
-            val bytes = retriever.embeddedPicture ?: return@withContext null
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            val options = BitmapFactory.Options().apply {
-                inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, 768)
+
+        // ① 文件内嵌封面（最优先，零网络）
+        val embedded = runCatching {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(context, Uri.parse(track.uri))
+                retriever.embeddedPicture
+            } finally {
+                runCatching { retriever.release() }
             }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.also { cache.put(track.uri, it) }
-        } catch (error: Exception) {
-            null
-        } finally {
-            runCatching { retriever.release() }
+        }.getOrNull()
+
+        if (embedded != null) {
+            return@withContext decode(embedded)?.also { cache.put(track.uri, it) }
         }
+
+        // ② 之前联网存下来的封面缓存（有就直接用，不联网）
+        val cached = runCatching {
+            CoverFetcher.cacheFile(context, track.id.toString()).takeIf { it.exists() }?.readBytes()
+        }.getOrNull()
+        if (cached != null) {
+            return@withContext decode(cached)?.also { cache.put(track.uri, it) }
+        }
+
+        // ③ 联网补封面：和歌词共用同一个开关，默认关；开了「仅 WiFi」就只在 WiFi 下走
+        val settings = runCatching { context.app.settings.current() }.getOrNull() ?: return@withContext null
+        if (!settings.lyricOnline) return@withContext null
+        if (!NetworkState.canFetch(context)) return@withContext null
+
+        val fetched = CoverFetcher.fetch(context, track) ?: return@withContext null
+        decode(fetched)?.also { cache.put(track.uri, it) }
     }
+
+    /** 原始字节 → 按目标边长降采样的 Bitmap */
+    private fun decode(bytes: ByteArray): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, 768)
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+    }.getOrNull()
 
     private fun sampleSizeFor(width: Int, height: Int, target: Int): Int {
         if (width <= 0 || height <= 0) return 1
